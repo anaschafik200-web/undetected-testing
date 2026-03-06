@@ -82,6 +82,6 @@ jobs:
     #    python raw_cdp.py --debug
     - name: Run python ugeen.py
       run: |
-        python raw_socialblade.py --mode browser
-        python raw_socialblade.py --mode api
-        python raw_socialblade.py --mode subscribe
+        python ugeen.py --mode browser
+        python ugeen.py --mode api
+        python ugeen.py --mode subscribe
