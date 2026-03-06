@@ -1,4 +1,4 @@
-name: CI build 1 - (Ubuntu)
+name: CI build 0 - (Ubuntu)
 on:
   schedule:
     - cron: "14 */2 * * *"
@@ -80,7 +80,7 @@ jobs:
     #- name: Run python raw_cdp.py --debug
     #  run: |
     #    python raw_cdp.py --debug
-    - name: Run python ugeen.py --debug
+    - name: Run python ugeen.py
       run: |
         python raw_socialblade.py --mode browser
         python raw_socialblade.py --mode api
