@@ -80,8 +80,6 @@ jobs:
     #- name: Run python raw_cdp.py --debug
     #  run: |
     #    python raw_cdp.py --debug
-    - name: Run python ugeen.py
+    - name: Ugeen
       run: |
-        python ugeen.py --mode browser
-        python ugeen.py --mode api
-        python ugeen.py --mode subscribe
+        python ug.py
