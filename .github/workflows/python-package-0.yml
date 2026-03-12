@@ -34,14 +34,21 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
 
+    # -------------------------------------------------
+    # Install system packages
+    # -------------------------------------------------
+
     - name: Install System Dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y wget ffmpeg gnupg unzip
+        sudo apt-get install -y wget ffmpeg gnupg unzip tzdata locales
+
+    # -------------------------------------------------
+    # Set locale
+    # -------------------------------------------------
 
     - name: Set Locale
       run: |
-        sudo apt-get install -y tzdata locales
         sudo locale-gen en_US.UTF-8
         sudo localectl set-locale LANG="en_US.UTF-8"
         export LANG="en_US.UTF-8"
@@ -51,34 +58,58 @@ jobs:
         locale -c -k LC_NUMERIC
         localectl status
 
+    # -------------------------------------------------
+    # Install Python dependencies
+    # -------------------------------------------------
+
     - name: Install Python Dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install --upgrade pip
-        pip install --upgrade wheel
+        pip install --upgrade wheel setuptools
+        pip install "pytest<9"
         pip install -r requirements.txt
         pip install --upgrade pyautogui
         pip install --upgrade python-xlib
         pip install recaptcha-cracker ffmpeg-python
+        pip install SpeechRecognition pydub
+
+    # -------------------------------------------------
+    # Install Chrome
+    # -------------------------------------------------
 
     - name: Install Chrome
-      if: matrix.os == 'ubuntu-20.04'
       run: |
-        sudo apt install google-chrome-stable
+        sudo apt-get install -y google-chrome-stable || true
+
+    # -------------------------------------------------
+    # Check SeleniumBase
+    # -------------------------------------------------
 
     - name: Check the console scripts interface
       run: |
         seleniumbase
         sbase
 
+    # -------------------------------------------------
+    # Install Chromedriver
+    # -------------------------------------------------
+
     - name: Install chromedriver
       run: |
         seleniumbase install chromedriver
+
+    # -------------------------------------------------
+    # Verify pytest works
+    # -------------------------------------------------
 
     - name: Make sure pytest is working
       run: |
         echo "def test_1(): pass" > nothing.py
         pytest nothing.py --uc
+
+    # -------------------------------------------------
+    # Check Chrome binaries
+    # -------------------------------------------------
 
     - name: Check which Chrome binaries exist
       run: |
@@ -87,22 +118,26 @@ jobs:
         python -c "import os; print(os.path.exists('/bin/chromium-browser'))"
         python -c "import os; print(os.path.exists('/bin/chromium'))"
 
+    # -------------------------------------------------
+    # Display Chrome path
+    # -------------------------------------------------
+
     - name: Display Chrome binary that's used
       run: |
         python -c "from seleniumbase.core import detect_b_ver; print(detect_b_ver.get_binary_location('google-chrome'))"
         python -c "from seleniumbase import undetected; print(undetected.find_chrome_executable())"
 
-    #- name: Run python test_user_agent.py
-    #  run: |
-    #    python test_user_agent.py
+    # -------------------------------------------------
+    # Run debug script
+    # -------------------------------------------------
 
     - name: Run python raw_uc_mode.py --debug
       run: |
         python raw_uc_mode.py --debug
 
-    #- name: Run python raw_cdp.py --debug
-    #  run: |
-    #    python raw_cdp.py --debug
+    # -------------------------------------------------
+    # Run your Ugeen script
+    # -------------------------------------------------
 
     - name: Ugeen
       run: |
