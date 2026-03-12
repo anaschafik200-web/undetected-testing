@@ -1,50 +1,35 @@
 #!/usr/bin/env python3
-"""
-UGEEN.LIVE — Auto Login + reCAPTCHA Audio Solver (SeleniumBase Version)
-
-Features
---------
-✔ Undetected Chrome (SeleniumBase UC)
-✔ Google reCAPTCHA audio solver
-✔ ffmpeg audio conversion
-✔ SpeechRecognition transcription
-✔ Automatic screenshots
-✔ Stable iframe switching
-✔ Real login verification
-"""
 
 import os
 import sys
 import time
 import json
 import random
-import shutil
 import logging
+import shutil
 import tempfile
 import subprocess
 import requests
 
 from seleniumbase import SB
 
-# ───────────────── CONFIG ───────────────── #
+# ---------------- CONFIG ---------------- #
 
-EMAIL = "anaschafik200@gmail.com"
-PASSWORD = "jesuisen600"
+EMAIL = "YOUR_EMAIL"
+PASSWORD = "YOUR_PASSWORD"
 
 LOGIN_URL = "http://ugeen.live/signin.html"
 
 TOKEN_FILE = "token.txt"
 SESSION_FILE = "session.json"
 
-MAX_RETRIES = 3
-TIMEOUT = 20
-
-AUDIO_DIR = tempfile.mkdtemp(prefix="ugeen_captcha_")
-
 SCREENSHOT_DIR = "screenshots"
 os.makedirs(SCREENSHOT_DIR, exist_ok=True)
 
-# ────────────── LOGGING ────────────── #
+MAX_RETRIES = 3
+AUDIO_DIR = tempfile.mkdtemp(prefix="ugeen_audio_")
+
+# ---------------- LOGGING ---------------- #
 
 logging.basicConfig(
     level=logging.INFO,
@@ -54,7 +39,7 @@ logging.basicConfig(
 
 log = logging.getLogger("ugeen")
 
-# ────────────── RECAPTCHA SELECTORS ────────────── #
+# ---------------- SELECTORS ---------------- #
 
 RECAPTCHA_ANCHOR_FRAME = 'iframe[src*="recaptcha"][src*="anchor"]'
 RECAPTCHA_BFRAME = 'iframe[src*="recaptcha"][src*="bframe"]'
@@ -63,9 +48,8 @@ SEL_AUDIO_BTN = "#recaptcha-audio-button"
 SEL_AUDIO_SRC = "#audio-source"
 SEL_AUDIO_INPUT = "#audio-response"
 SEL_VERIFY_BTN = "#recaptcha-verify-button"
-SEL_RELOAD_BTN = "#recaptcha-reload-button"
 
-# ───────────────── UTILS ───────────────── #
+# ---------------- UTILS ---------------- #
 
 def shot(sb, name):
     ts = time.strftime("%H%M%S")
@@ -81,6 +65,23 @@ def human_type(sb, selector, text):
         time.sleep(random.uniform(0.04, 0.09))
 
 
+def safe_clear_storage(sb):
+    """CI-safe localStorage clear"""
+    try:
+        sb.execute_script("""
+        try {
+            if (window.location.origin !== "null") {
+                window.localStorage.clear();
+                window.sessionStorage.clear();
+            }
+        } catch(e) {
+            console.log("Storage clear skipped:", e);
+        }
+        """)
+    except Exception:
+        pass
+
+
 def switch_frame(sb, selector):
     try:
         sb.switch_to_default_content()
@@ -90,13 +91,12 @@ def switch_frame(sb, selector):
     except Exception:
         return False
 
-
-# ───────────────── AUDIO ───────────────── #
+# ---------------- AUDIO CAPTCHA ---------------- #
 
 def download_audio(url, dest):
+
     headers = {
-        "User-Agent":
-        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120 Safari/537.36"
+        "User-Agent": "Mozilla/5.0"
     }
 
     r = requests.get(url, headers=headers, timeout=20)
@@ -118,8 +118,6 @@ def convert_audio(mp3, wav):
         "1",
         "-ar",
         "16000",
-        "-acodec",
-        "pcm_s16le",
         wav,
     ]
 
@@ -145,36 +143,32 @@ def transcribe(wav):
         return None
 
 
-def solve_audio(audio_url, attempt):
+def solve_audio(url, attempt):
 
     mp3 = os.path.join(AUDIO_DIR, f"{attempt}.mp3")
     wav = os.path.join(AUDIO_DIR, f"{attempt}.wav")
 
-    if not download_audio(audio_url, mp3):
+    if not download_audio(url, mp3):
         return None
 
     if not convert_audio(mp3, wav):
         return None
 
-    text = transcribe(wav)
+    return transcribe(wav)
 
-    return text
-
-
-# ───────────────── CAPTCHA ───────────────── #
+# ---------------- CAPTCHA HANDLER ---------------- #
 
 def handle_recaptcha(sb):
 
-    log.info("reCAPTCHA challenge detected")
+    log.info("CAPTCHA detected")
 
     if not switch_frame(sb, RECAPTCHA_BFRAME):
         return False
 
-    time.sleep(1)
-
     if sb.is_element_visible(SEL_AUDIO_BTN):
         sb.js_click(SEL_AUDIO_BTN)
-        time.sleep(2)
+
+    time.sleep(2)
 
     for attempt in range(1, MAX_RETRIES + 1):
 
@@ -188,17 +182,10 @@ def handle_recaptcha(sb):
         if not audio_url:
             return False
 
-        sb.switch_to_default_content()
-
         text = solve_audio(audio_url, attempt)
 
         if not text:
             continue
-
-        log.info(f"CAPTCHA text: {text}")
-
-        if not switch_frame(sb, RECAPTCHA_BFRAME):
-            return False
 
         sb.type(SEL_AUDIO_INPUT, text)
 
@@ -219,12 +206,16 @@ def handle_recaptcha(sb):
 
     return False
 
-
-# ───────────────── LOGIN ───────────────── #
+# ---------------- LOGIN ---------------- #
 
 def verify_login(sb):
 
-    token = sb.execute_script("return localStorage.getItem('jsonwebToken');")
+    try:
+        token = sb.execute_script(
+            "return window.localStorage.getItem('jsonwebToken');"
+        )
+    except Exception:
+        token = None
 
     url = sb.get_current_url()
 
@@ -238,19 +229,18 @@ def login():
 
     log.info("UGEEN LOGIN START")
 
-    with SB(uc=True, headless=False, locale_code="en") as sb:
-
-        # OPEN PAGE
+    with SB(uc=True, headless=True) as sb:
 
         sb.uc_open_with_reconnect(LOGIN_URL)
 
+        sb.sleep(2)
+        sb.wait_for_ready_state_complete()
+
         shot(sb, "login_page")
 
-        sb.execute_script("localStorage.clear();sessionStorage.clear();")
+        safe_clear_storage(sb)
 
         sb.wait_for_element("#email", timeout=15)
-
-        # FILL FORM
 
         human_type(sb, "#email", EMAIL)
         human_type(sb, "#password", PASSWORD)
@@ -261,15 +251,15 @@ def login():
 
         shot(sb, "login_clicked")
 
-        # WAIT FOR CAPTCHA OR REDIRECT
-
         captcha_handled = False
 
         for _ in range(40):
 
             time.sleep(0.5)
 
-            if verify_login(sb):
+            token = verify_login(sb)
+
+            if token:
                 break
 
             frames = sb.find_elements('iframe[src*="recaptcha"]')
@@ -278,21 +268,16 @@ def login():
 
                 src = f.get_attribute("src") or ""
 
-                if "bframe" in src:
+                if "bframe" in src and not captcha_handled:
 
-                    if not captcha_handled:
+                    captcha_handled = True
 
-                        captcha_handled = True
+                    shot(sb, "captcha_detected")
 
-                        shot(sb, "captcha_detected")
+                    solved = handle_recaptcha(sb)
 
-                        solved = handle_recaptcha(sb)
-
-                        if solved:
-                            time.sleep(4)
-
-            if verify_login(sb):
-                break
+                    if solved:
+                        time.sleep(3)
 
         token = verify_login(sb)
 
@@ -303,10 +288,12 @@ def login():
         shot(sb, "dashboard")
 
         username = sb.execute_script(
-            "return localStorage.getItem('username');")
+            "return window.localStorage.getItem('username');"
+        )
 
         expire = sb.execute_script(
-            "return localStorage.getItem('authExpire');")
+            "return window.localStorage.getItem('authExpire');"
+        )
 
         session = {
             "token": token,
@@ -324,8 +311,7 @@ def login():
 
         return token
 
-
-# ───────────────── TOKEN TEST ───────────────── #
+# ---------------- TOKEN TEST ---------------- #
 
 def test_token(token):
 
@@ -341,13 +327,12 @@ def test_token(token):
     else:
         log.error("Token invalid")
 
-
-# ───────────────── MAIN ───────────────── #
+# ---------------- MAIN ---------------- #
 
 if __name__ == "__main__":
 
     if not shutil.which("ffmpeg"):
-        print("Install ffmpeg first")
+        print("ffmpeg not installed")
         sys.exit()
 
     token = login()
