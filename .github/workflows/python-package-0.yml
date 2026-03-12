@@ -1,4 +1,5 @@
 name: CI build 0 - (Ubuntu)
+
 on:
   schedule:
     - cron: "14 */2 * * *"
@@ -14,6 +15,7 @@ jobs:
 
     env:
       PY_COLORS: "1"
+
     strategy:
       fail-fast: false
       max-parallel: 1
@@ -22,15 +24,25 @@ jobs:
         python-version: ["3.13"]
 
     runs-on: ${{ matrix.os }}
+
     steps:
+
     - uses: actions/checkout@v6
+
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v6
       with:
         python-version: ${{ matrix.python-version }}
+
+    - name: Install System Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y wget ffmpeg gnupg unzip
+
     - name: Set Locale
       run: |
-        sudo apt-get install tzdata locales -y && sudo locale-gen en_US.UTF-8
+        sudo apt-get install -y tzdata locales
+        sudo locale-gen en_US.UTF-8
         sudo localectl set-locale LANG="en_US.UTF-8"
         export LANG="en_US.UTF-8"
         sudo update-locale
@@ -38,7 +50,8 @@ jobs:
         locale
         locale -c -k LC_NUMERIC
         localectl status
-    - name: Install dependencies
+
+    - name: Install Python Dependencies
       run: |
         python -m pip install --upgrade pip
         pip install --upgrade pip
@@ -46,42 +59,51 @@ jobs:
         pip install -r requirements.txt
         pip install --upgrade pyautogui
         pip install --upgrade python-xlib
+        pip install recaptcha-cracker ffmpeg-python
+
     - name: Install Chrome
       if: matrix.os == 'ubuntu-20.04'
       run: |
         sudo apt install google-chrome-stable
+
     - name: Check the console scripts interface
       run: |
         seleniumbase
         sbase
+
     - name: Install chromedriver
       run: |
         seleniumbase install chromedriver
+
     - name: Make sure pytest is working
       run: |
         echo "def test_1(): pass" > nothing.py
         pytest nothing.py --uc
+
     - name: Check which Chrome binaries exist
       run: |
         python -c "import os; print(os.path.exists('/usr/bin/google-chrome'))"
         python -c "import os; print(os.path.exists('/bin/google-chrome-stable'))"
         python -c "import os; print(os.path.exists('/bin/chromium-browser'))"
         python -c "import os; print(os.path.exists('/bin/chromium'))"
+
     - name: Display Chrome binary that's used
       run: |
         python -c "from seleniumbase.core import detect_b_ver; print(detect_b_ver.get_binary_location('google-chrome'))"
         python -c "from seleniumbase import undetected; print(undetected.find_chrome_executable())"
+
     #- name: Run python test_user_agent.py
     #  run: |
     #    python test_user_agent.py
+
     - name: Run python raw_uc_mode.py --debug
       run: |
         python raw_uc_mode.py --debug
+
     #- name: Run python raw_cdp.py --debug
     #  run: |
     #    python raw_cdp.py --debug
+
     - name: Ugeen
       run: |
-        python ugeen.py --mode browser
-        python ugeen.py --mode api
-        python ugeen.py --mode subscribe
+        python ugeen.py
