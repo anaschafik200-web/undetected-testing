@@ -99,6 +99,6 @@ jobs:
         python raw_uc_mode.py --debug
 
     # Run your script
-    - name: Ugeen
+    - name: TEST
       run: |
-        python ugeen.py
+        python raw_antibot_login.py
